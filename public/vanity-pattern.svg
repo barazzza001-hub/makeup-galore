@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320" fill="none">
+  <!-- Soft Warm Cream Background matching image #2 -->
+  <rect width="320" height="320" fill="#FFFBF5"/>
+
+  <!-- Delicate Pink Line Art Doodles (#E11D48 with soft opacity) -->
+  <g stroke="#E11D48" stroke-opacity="0.26" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <!-- Lipstick Bullet 1 -->
+    <path d="M25 45 h16 v22 h-16 z"/>
+    <path d="M28 45 v-12 l10 -6 v18"/>
+    <path d="M23 67 h20 v22 h-20 z"/>
+    <line x1="23" y1="75" x2="43" y2="75"/>
+
+    <!-- Lips / Kiss -->
+    <path d="M120 35 c12 -8 24 -8 36 0 c-12 6 -24 6 -36 0 z"/>
+    <path d="M120 35 c12 10 24 10 36 0 c-12 8 -24 8 -36 0 z"/>
+    <path d="M130 35 c8 3 12 3 16 0"/>
+
+    <!-- Fluffy Makeup Brush -->
+    <path d="M250 20 l-30 30"/>
+    <path d="M220 50 l-12 12"/>
+    <path d="M250 20 c8 -8 18 -4 20 4 c2 8 -4 18 -12 20 z"/>
+    <line x1="245" y1="25" x2="258" y2="38"/>
+
+    <!-- Botanical Leaf Branch -->
+    <path d="M290 80 c-15 15 -30 25 -40 30"/>
+    <path d="M285 82 c-8 0 -12 -5 -10 -10 c5 2 8 6 10 10 z"/>
+    <path d="M275 92 c-8 2 -12 -3 -8 -8 c5 1 7 5 8 8 z"/>
+    <path d="M265 102 c-8 2 -10 -3 -7 -7 c4 1 6 4 7 7 z"/>
+
+    <!-- Perfume Bottle with Spray Atomizer -->
+    <path d="M30 140 h30 v25 h-30 z"/>
+    <path d="M38 140 v-12 h14 v12"/>
+    <path d="M25 165 h40 v40 h-40 z"/>
+    <circle cx="45" cy="185" r="10"/>
+
+    <!-- Glass Serum Dropper -->
+    <path d="M140 120 v20 h10 v-20 z"/>
+    <path d="M142 120 c0 -8 6 -12 12 -5 c3 4 0 10 -4 10 z"/>
+    <path d="M135 140 h20 v35 h-20 z"/>
+
+    <!-- Heart -->
+    <path d="M230 160 c-4 -6 -10 -3 -10 3 c0 8 10 13 10 13 c0 0 10 -5 10 -13 c0 -6 -6 -9 -10 -3 z"/>
+
+    <!-- Four-Point Sparkle Star -->
+    <path d="M100 90 l3 7 l7 3 l-7 3 l-3 7 l-3 -7 l-7 -3 l7 -3 z"/>
+    <path d="M280 180 l2 5 l5 2 l-5 2 l-2 5 l-2 -5 l-5 -2 l5 -2 z"/>
+    <path d="M80 230 l2 5 l5 2 l-5 2 l-2 5 l-2 -5 l-5 -2 l5 -2 z"/>
+
+    <!-- Triangular Compact Powder -->
+    <path d="M210 220 l25 -35 l25 35 z"/>
+    <path d="M218 218 l17 -24 l17 24 z"/>
+
+    <!-- Comb -->
+    <path d="M100 240 h65 v10 h-65 z"/>
+    <path d="M105 250 v15 M113 250 v15 M121 250 v15 M129 250 v15 M137 250 v15 M145 250 v15 M153 250 v15 M161 250 v15"/>
+
+    <!-- Lip Gloss Tube -->
+    <path d="M20 270 l30 -15 l6 12 l-30 15 z"/>
+    <path d="M50 255 l10 -5 l4 8 l-10 5 z"/>
+
+    <!-- Rose Petal / Flower -->
+    <path d="M280 270 c-12 -12 -28 0 -16 16 c12 12 28 0 16 -16 z"/>
+    <circle cx="280" cy="270" r="5"/>
+
+    <!-- Tiny Polka Dot Accents -->
+    <circle cx="70" cy="50" r="1.5" fill="#E11D48" fill-opacity="0.25"/>
+    <circle cx="180" cy="70" r="1.5" fill="#E11D48" fill-opacity="0.25"/>
+    <circle cx="110" cy="180" r="1.5" fill="#E11D48" fill-opacity="0.25"/>
+    <circle cx="190" cy="140" r="1.5" fill="#E11D48" fill-opacity="0.25"/>
+    <circle cx="290" cy="130" r="1.5" fill="#E11D48" fill-opacity="0.25"/>
+  </g>
+</svg>

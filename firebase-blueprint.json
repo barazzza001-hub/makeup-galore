@@ -1,0 +1,91 @@
+{
+  "entities": {
+    "users": {
+      "fields": {
+        "uid": { "type": "string", "description": "User UID from Firebase Auth" },
+        "email": { "type": "string", "description": "User email address" },
+        "displayName": { "type": "string", "description": "User display name" },
+        "beautyName": { "type": "string", "description": "Personalized beauty desk title" },
+        "avatarUrl": { "type": "string", "description": "Profile picture URL or base64" },
+        "bio": { "type": "string", "description": "User bio or tagline" },
+        "role": { "type": "string", "description": "Role: customer or admin" },
+        "skinType": { "type": "string", "description": "User skin type" },
+        "favoriteShade": { "type": "string", "description": "Signature beauty shade" },
+        "createdAt": { "type": "timestamp", "description": "Account creation date" },
+        "updatedAt": { "type": "timestamp", "description": "Last profile update" }
+      },
+      "rules": "User can read and update their own document. Admin can read all users."
+    },
+    "products": {
+      "fields": {
+        "id": { "type": "string", "description": "Unique product ID" },
+        "name": { "type": "string", "description": "Product title" },
+        "description": { "type": "string", "description": "Product details" },
+        "category": { "type": "string", "description": "Product category" },
+        "price": { "type": "number", "description": "Price in KSh" },
+        "currency": { "type": "string", "description": "Currency code (KSh)" },
+        "image": { "type": "string", "description": "Primary product image URL" },
+        "images": { "type": "array", "description": "Gallery image URLs" },
+        "stock": { "type": "number", "description": "Stock quantity available" },
+        "isAvailable": { "type": "boolean", "description": "Availability flag" },
+        "brand": { "type": "string", "description": "Brand name" },
+        "rating": { "type": "number", "description": "Customer rating" },
+        "reviewsCount": { "type": "number", "description": "Number of reviews" },
+        "shades": { "type": "array", "description": "Available shade names" },
+        "createdAt": { "type": "timestamp", "description": "Creation timestamp" },
+        "updatedAt": { "type": "timestamp", "description": "Last updated timestamp" }
+      },
+      "rules": "Public read. Write access restricted to admin users."
+    },
+    "orders": {
+      "fields": {
+        "id": { "type": "string", "description": "Unique order ID" },
+        "customerId": { "type": "string", "description": "Auth UID of customer" },
+        "customerName": { "type": "string", "description": "Customer name" },
+        "customerEmail": { "type": "string", "description": "Customer email" },
+        "customerPhone": { "type": "string", "description": "Customer phone" },
+        "deliveryAddress": { "type": "string", "description": "Delivery address" },
+        "deliveryInstructions": { "type": "string", "description": "Delivery notes" },
+        "items": { "type": "array", "description": "List of ordered items" },
+        "subtotal": { "type": "number", "description": "Subtotal amount in KSh" },
+        "deliveryFee": { "type": "number", "description": "Delivery fee in KSh" },
+        "total": { "type": "number", "description": "Total order price in KSh" },
+        "currency": { "type": "string", "description": "Currency string (KSh)" },
+        "status": { "type": "string", "description": "Status: NEW, CONFIRMED, PACKED, OUT FOR DELIVERY, COMPLETED, CANCELLED" },
+        "createdAt": { "type": "timestamp", "description": "Order placement timestamp" },
+        "updatedAt": { "type": "timestamp", "description": "Status change timestamp" }
+      },
+      "rules": "Authenticated customers can create orders and read their own orders. Admins can read and update all orders."
+    },
+    "savedLooks": {
+      "fields": {
+        "id": { "type": "string", "description": "Saved look ID" },
+        "userId": { "type": "string", "description": "Owner auth UID" },
+        "title": { "type": "string", "description": "Look title" },
+        "date": { "type": "string", "description": "Formatted date" },
+        "preset": { "type": "string", "description": "Preset name" },
+        "imageUrl": { "type": "string", "description": "Processed image data or URL" },
+        "productsUsed": { "type": "array", "description": "List of product names used" },
+        "notes": { "type": "string", "description": "Personal beauty notes" },
+        "createdAt": { "type": "timestamp", "description": "Save timestamp" }
+      },
+      "rules": "Users can create, read, update, and delete their own saved looks."
+    },
+    "businessSettings": {
+      "fields": {
+        "businessName": { "type": "string", "description": "Company name" },
+        "phone": { "type": "string", "description": "Primary phone" },
+        "whatsapp": { "type": "string", "description": "WhatsApp contact" },
+        "email": { "type": "string", "description": "Support email" },
+        "website": { "type": "string", "description": "Website URL" },
+        "instagram": { "type": "string", "description": "Instagram handle" },
+        "tiktok": { "type": "string", "description": "TikTok handle" },
+        "facebook": { "type": "string", "description": "Facebook page" },
+        "physicalLocation": { "type": "string", "description": "Store location" },
+        "deliveryInfo": { "type": "string", "description": "Delivery options" },
+        "updatedAt": { "type": "timestamp", "description": "Last settings update" }
+      },
+      "rules": "Public read access. Admin write access."
+    }
+  }
+}
