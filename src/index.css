@@ -1,38 +1,118 @@
 @import "tailwindcss";
 
-/* Constant Base Background Pattern Styles */
-html, body {
+/* =========================================================
+   MAKEUP GALORE — GLOBAL THEME
+   ========================================================= */
+
+:root {
+  --mg-background: #fff9fc;
+  --mg-surface: #ffffff;
+  --mg-surface-soft: #fff1f6;
+  --mg-text: #4a3038;
+  --mg-text-muted: #8a6872;
+  --mg-primary: #e98eae;
+  --mg-primary-dark: #d96f96;
+  --mg-border: #f3d5e0;
+  --mg-pattern: url('/vanity-pattern-pink.svg');
+}
+
+/* =========================================================
+   DARK MODE — CHOCOLATE BLUSH
+   ========================================================= */
+
+html.dark,
+body.dark {
+  --mg-background: #24171a;
+  --mg-surface: #342124;
+  --mg-surface-soft: #42282e;
+  --mg-text: #fff1f5;
+  --mg-text-muted: #d0aeb7;
+  --mg-primary: #e58baa;
+  --mg-primary-dark: #f0a0bd;
+  --mg-border: #5b3840;
+  --mg-pattern: url('/vanity-pattern-pink.svg');
+}
+
+/* =========================================================
+   BASE
+   ========================================================= */
+
+html,
+body {
   min-height: 100vh;
   margin: 0;
   padding: 0;
-  color: #1F2937;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  background-color: #FFFBF5 !important;
-  background-image: url('/vanity-pattern.svg') !important;
-  background-repeat: repeat !important;
-  background-size: 260px 260px !important;
-  background-attachment: fixed !important;
+
+  color: var(--mg-text);
+
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    Oxygen,
+    Ubuntu,
+    Cantarell,
+    sans-serif;
+
+  background-color: var(--mg-background);
+  background-image: var(--mg-pattern);
+  background-repeat: repeat;
+  background-size: 260px 260px;
+  background-attachment: fixed;
+
+  transition:
+    background-color 250ms ease,
+    color 250ms ease;
 }
 
-body.theme-cream-doodle {
-  background-color: #FFFBF5 !important;
-  background-image: url('/vanity-pattern.svg') !important;
-  background-repeat: repeat !important;
-  background-size: 260px 260px !important;
-  background-attachment: fixed !important;
+/* =========================================================
+   DARK MODE BODY
+   ========================================================= */
+
+body.dark {
+  background-color: #24171a;
+  background-image:
+    linear-gradient(
+      rgba(36, 23, 26, 0.88),
+      rgba(36, 23, 26, 0.88)
+    ),
+    url('/vanity-pattern-pink.svg');
+
+  background-repeat: repeat;
+  background-size: 260px 260px;
+  background-attachment: fixed;
 }
 
-body.theme-rose-doodle {
-  background-color: #FCE7F3 !important;
-  background-image: url('/vanity-pattern-pink.svg') !important;
-  background-repeat: repeat !important;
-  background-size: 260px 260px !important;
-  background-attachment: fixed !important;
+/* =========================================================
+   LIGHT MODE
+   ========================================================= */
+
+body:not(.dark) {
+  background-color: #fff9fc;
+  background-image: url('/vanity-pattern-pink.svg');
+  background-repeat: repeat;
+  background-size: 260px 260px;
+  background-attachment: fixed;
 }
 
-/* Touch action optimization for smooth swipe gestures */
+/* =========================================================
+   SMOOTH THEME TRANSITIONS
+   ========================================================= */
+
+* {
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease,
+    color 200ms ease;
+}
+
+/* =========================================================
+   TOUCH ACTION OPTIMIZATION
+   ========================================================= */
+
 .swipeable-card {
   touch-action: pan-y;
   will-change: transform;
 }
-
