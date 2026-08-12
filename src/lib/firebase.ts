@@ -5,6 +5,10 @@ import {
 } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import {
+  initializeAppCheck,
+  ReCaptchaEnterpriseProvider,
+} from "firebase/app-check";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCpN2-6gjHqykIYU0XjC-qRKmhmmWpqPWs",
@@ -20,9 +24,16 @@ export const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
 
-export const googleProvider =
-  new GoogleAuthProvider();
+export const googleProvider = new GoogleAuthProvider();
 
 export const db = getFirestore(app);
 
 export const storage = getStorage(app);
+
+// Firebase App Check
+export const appCheck = initializeAppCheck(app, {
+  provider: new ReCaptchaEnterpriseProvider(
+    "PASTE_YOUR_RECAPTCHA_ENTERPRISE_SITE_KEY_HERE"
+  ),
+  isTokenAutoRefreshEnabled: true,
+});
