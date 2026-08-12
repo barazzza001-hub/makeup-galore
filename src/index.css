@@ -1,40 +1,8 @@
 @import "tailwindcss";
 
 /* =========================================================
-   MAKEUP GALORE — GLOBAL THEME
-   ========================================================= */
-
-:root {
-  --mg-background: #fff9fc;
-  --mg-surface: #ffffff;
-  --mg-surface-soft: #fff1f6;
-  --mg-text: #4a3038;
-  --mg-text-muted: #8a6872;
-  --mg-primary: #e98eae;
-  --mg-primary-dark: #d96f96;
-  --mg-border: #f3d5e0;
-  --mg-pattern: url('/vanity-pattern-pink.svg');
-}
-
-/* =========================================================
-   DARK MODE — CHOCOLATE BLUSH
-   ========================================================= */
-
-html.dark,
-body.dark {
-  --mg-background: #24171a;
-  --mg-surface: #342124;
-  --mg-surface-soft: #42282e;
-  --mg-text: #fff1f5;
-  --mg-text-muted: #d0aeb7;
-  --mg-primary: #e58baa;
-  --mg-primary-dark: #f0a0bd;
-  --mg-border: #5b3840;
-  --mg-pattern: url('/vanity-pattern-pink.svg');
-}
-
-/* =========================================================
-   BASE
+   JULIET'S MAKEUP GALORE
+   LIGHT + DARK VANITY THEMES
    ========================================================= */
 
 html,
@@ -42,74 +10,204 @@ body {
   min-height: 100vh;
   margin: 0;
   padding: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 
-  color: var(--mg-text);
+  color: #1f2937;
 
-  font-family:
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    Oxygen,
-    Ubuntu,
-    Cantarell,
-    sans-serif;
-
-  background-color: var(--mg-background);
-  background-image: var(--mg-pattern);
-  background-repeat: repeat;
-  background-size: 260px 260px;
-  background-attachment: fixed;
+  /* LIGHT MODE */
+  background-color: #fffbf5 !important;
+  background-image: url("/vanity-pattern.svg") !important;
+  background-repeat: repeat !important;
+  background-size: 260px 260px !important;
+  background-attachment: fixed !important;
 
   transition:
-    background-color 250ms ease,
-    color 250ms ease;
+    background-color 0.3s ease,
+    color 0.3s ease;
 }
 
 /* =========================================================
-   DARK MODE BODY
+   LIGHT THEME
+   Pinky-white vanity
    ========================================================= */
 
-body.dark {
-  background-color: #24171a;
-  background-image:
-    linear-gradient(
-      rgba(36, 23, 26, 0.88),
-      rgba(36, 23, 26, 0.88)
-    ),
-    url('/vanity-pattern-pink.svg');
+body.theme-cream-doodle {
+  color: #1f2937 !important;
 
-  background-repeat: repeat;
-  background-size: 260px 260px;
-  background-attachment: fixed;
+  background-color: #fffbf5 !important;
+  background-image: url("/vanity-pattern.svg") !important;
+  background-repeat: repeat !important;
+  background-size: 260px 260px !important;
+  background-attachment: fixed !important;
 }
 
 /* =========================================================
-   LIGHT MODE
+   ROSE THEME
    ========================================================= */
 
-body:not(.dark) {
-  background-color: #fff9fc;
-  background-image: url('/vanity-pattern-pink.svg');
-  background-repeat: repeat;
-  background-size: 260px 260px;
-  background-attachment: fixed;
+body.theme-rose-doodle {
+  color: #4a1f2b !important;
+
+  background-color: #fce7f3 !important;
+  background-image: url("/vanity-pattern-pink.svg") !important;
+  background-repeat: repeat !important;
+  background-size: 260px 260px !important;
+  background-attachment: fixed !important;
 }
 
 /* =========================================================
-   SMOOTH THEME TRANSITIONS
+   DARK THEME
+   Chocolate brown + dusty pink
    ========================================================= */
 
-* {
+body.theme-dark {
+  color: #fce7ef !important;
+
+  background-color: #2b171b !important;
+  background-image: url("/vanity-pattern-pink.svg") !important;
+  background-repeat: repeat !important;
+  background-size: 260px 260px !important;
+  background-attachment: fixed !important;
+}
+
+/* Dark mode main surfaces */
+body.theme-dark .bg-white {
+  background-color: #3b2227 !important;
+}
+
+body.theme-dark .bg-white\/90 {
+  background-color: rgba(59, 34, 39, 0.92) !important;
+}
+
+body.theme-dark .bg-white\/95 {
+  background-color: rgba(59, 34, 39, 0.95) !important;
+}
+
+/* Dark mode pink surfaces */
+body.theme-dark .bg-pink-50 {
+  background-color: #4a2930 !important;
+}
+
+body.theme-dark .bg-pink-100 {
+  background-color: #573039 !important;
+}
+
+body.theme-dark .bg-pink-50\/40 {
+  background-color: rgba(74, 41, 48, 0.4) !important;
+}
+
+body.theme-dark .bg-pink-50\/90 {
+  background-color: rgba(74, 41, 48, 0.9) !important;
+}
+
+/* Dark mode text */
+body.theme-dark .text-gray-900 {
+  color: #ffe7ef !important;
+}
+
+body.theme-dark .text-gray-800 {
+  color: #fbdce5 !important;
+}
+
+body.theme-dark .text-gray-700 {
+  color: #e8c5cf !important;
+}
+
+body.theme-dark .text-gray-600 {
+  color: #d6aeb9 !important;
+}
+
+body.theme-dark .text-gray-500 {
+  color: #c694a1 !important;
+}
+
+/* Dark mode borders */
+body.theme-dark .border-gray-200 {
+  border-color: #68404a !important;
+}
+
+body.theme-dark .border-gray-300 {
+  border-color: #754753 !important;
+}
+
+body.theme-dark .border-pink-100 {
+  border-color: #68404a !important;
+}
+
+body.theme-dark .border-pink-200 {
+  border-color: #754753 !important;
+}
+
+body.theme-dark .border-pink-300 {
+  border-color: #875362 !important;
+}
+
+/* Dark mode pink text */
+body.theme-dark .text-pink-500 {
+  color: #f09ab2 !important;
+}
+
+body.theme-dark .text-pink-600 {
+  color: #f5a6bd !important;
+}
+
+body.theme-dark .text-pink-700 {
+  color: #f8b7c9 !important;
+}
+
+/* Dark mode amber text */
+body.theme-dark .text-amber-700 {
+  color: #e8b8a0 !important;
+}
+
+/* =========================================================
+   DARK MODE INPUTS
+   ========================================================= */
+
+body.theme-dark input,
+body.theme-dark textarea,
+body.theme-dark select {
+  background-color: #3b2227 !important;
+  color: #ffe7ef !important;
+  border-color: #68404a !important;
+}
+
+body.theme-dark input::placeholder,
+body.theme-dark textarea::placeholder {
+  color: #b98492 !important;
+}
+
+/* =========================================================
+   DARK MODE BUTTONS / CARDS
+   ========================================================= */
+
+body.theme-dark .hover\:bg-pink-50:hover {
+  background-color: #4a2930 !important;
+}
+
+body.theme-dark .hover\:bg-pink-100:hover {
+  background-color: #573039 !important;
+}
+
+body.theme-dark .hover\:border-pink-200:hover {
+  border-color: #875362 !important;
+}
+
+/* =========================================================
+   THEME TRANSITION
+   ========================================================= */
+
+body,
+body * {
   transition:
-    background-color 200ms ease,
-    border-color 200ms ease,
-    color 200ms ease;
+    background-color 0.25s ease,
+    border-color 0.25s ease,
+    color 0.25s ease;
 }
 
 /* =========================================================
-   TOUCH ACTION OPTIMIZATION
+   TOUCH OPTIMIZATION
    ========================================================= */
 
 .swipeable-card {

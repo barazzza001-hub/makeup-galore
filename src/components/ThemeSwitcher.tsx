@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Moon, Sun, Check } from 'lucide-react';
+import { Sun, Moon, Check } from 'lucide-react';
 
 export type AppTheme = 'light' | 'dark';
 
@@ -9,16 +9,11 @@ interface ThemeSwitcherProps {
 }
 
 export const applyAppTheme = (theme: AppTheme) => {
-  const root = document.documentElement;
-  const body = document.body;
+  document.documentElement.classList.remove('theme-light', 'theme-dark');
+  document.body.classList.remove('theme-light', 'theme-dark');
 
-  root.classList.remove('dark');
-  body.classList.remove('dark');
-
-  if (theme === 'dark') {
-    root.classList.add('dark');
-    body.classList.add('dark');
-  }
+  document.documentElement.classList.add(`theme-${theme}`);
+  document.body.classList.add(`theme-${theme}`);
 
   localStorage.setItem('juliet_app_theme', theme);
 };
@@ -30,7 +25,11 @@ export const ThemeSwitcher: React.FC<ThemeSwitcherProps> = ({
   const [currentTheme, setCurrentTheme] = useState<AppTheme>(() => {
     const saved = localStorage.getItem('juliet_app_theme');
 
-    return saved === 'dark' ? 'dark' : 'light';
+    if (saved === 'dark' || saved === 'light') {
+      return saved;
+    }
+
+    return 'light';
   });
 
   useEffect(() => {
@@ -42,38 +41,36 @@ export const ThemeSwitcher: React.FC<ThemeSwitcherProps> = ({
     applyAppTheme(theme);
 
     if (onThemeChanged) {
-      onThemeChanged(
-        theme === 'dark'
-          ? 'Chocolate Blush'
-          : 'Pink Vanity'
-      );
+      onThemeChanged(theme === 'dark' ? 'Dark Mode' : 'Light Mode');
     }
   };
 
   if (variant === 'compact') {
     return (
-      <div className="flex items-center gap-1 bg-white/90 dark:bg-[#342124]/90 border border-pink-200 dark:border-[#5b3840] p-1 rounded-full shadow-sm">
+      <div className="flex items-center gap-1 rounded-full border border-pink-200 bg-white/90 p-1 shadow-sm">
         <button
+          type="button"
           onClick={() => handleSelectTheme('light')}
-          className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 ${
+          className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold transition-all ${
             currentTheme === 'light'
-              ? 'bg-pink-500 text-white'
-              : 'text-gray-600 dark:text-pink-100 hover:bg-pink-100 dark:hover:bg-[#42282e]'
+              ? 'bg-pink-500 text-white shadow-sm'
+              : 'text-gray-600 hover:bg-pink-50 hover:text-pink-600'
           }`}
         >
-          <Sun className="w-3.5 h-3.5" />
+          <Sun className="h-3.5 w-3.5" />
           Light
         </button>
 
         <button
+          type="button"
           onClick={() => handleSelectTheme('dark')}
-          className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 ${
+          className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold transition-all ${
             currentTheme === 'dark'
-              ? 'bg-pink-500 text-white'
-              : 'text-gray-600 dark:text-pink-100 hover:bg-pink-100 dark:hover:bg-[#42282e]'
+              ? 'bg-pink-600 text-white shadow-sm'
+              : 'text-gray-600 hover:bg-pink-50 hover:text-pink-600'
           }`}
         >
-          <Moon className="w-3.5 h-3.5" />
+          <Moon className="h-3.5 w-3.5" />
           Dark
         </button>
       </div>
@@ -81,113 +78,89 @@ export const ThemeSwitcher: React.FC<ThemeSwitcherProps> = ({
   }
 
   return (
-    <div className="bg-white/90 dark:bg-[#342124]/95 backdrop-blur-md rounded-3xl p-4 border border-pink-100 dark:border-[#5b3840] shadow-sm space-y-3">
+    <div className="space-y-3 rounded-3xl border border-pink-100 bg-white/90 p-4 shadow-sm backdrop-blur-md">
+      <div>
+        <h3 className="font-serif text-sm font-bold text-gray-900">
+          Appearance
+        </h3>
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="font-serif font-bold text-sm text-gray-900 dark:text-pink-50">
-            Vanity Theme
-          </h3>
-
-          <p className="text-[10px] text-gray-500 dark:text-pink-200 mt-0.5">
-            Choose your makeup desk mood
-          </p>
-        </div>
-
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-pink-500 bg-pink-50 dark:bg-[#42282e] px-2 py-1 rounded-full border border-pink-200/60 dark:border-[#5b3840]">
-          Theme
-        </span>
+        <p className="mt-1 text-[11px] text-gray-500">
+          Choose the look of your Makeup Galore beauty desk.
+        </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-2.5">
-
-        {/* LIGHT */}
-
+      <div className="grid grid-cols-2 gap-3">
         <button
+          type="button"
           onClick={() => handleSelectTheme('light')}
-          className={`p-3 rounded-2xl border text-left transition-all relative overflow-hidden cursor-pointer min-h-[105px] ${
+          className={`relative overflow-hidden rounded-2xl border p-4 text-left transition-all ${
             currentTheme === 'light'
-              ? 'border-pink-500 ring-2 ring-pink-400/30 bg-pink-50'
-              : 'border-gray-200 hover:border-pink-200 bg-white'
+              ? 'border-pink-500 bg-pink-50 ring-2 ring-pink-300/40'
+              : 'border-gray-200 bg-white hover:border-pink-300'
           }`}
         >
-
-          <div className="absolute inset-0 bg-gradient-to-br from-white via-pink-50 to-pink-100 opacity-80" />
-
-          <div className="relative z-10">
-
-            <div className="flex items-center justify-between">
-
-              <div className="flex items-center gap-1.5">
-
-                <Sun className="w-4 h-4 text-pink-500" />
-
-                <span className="font-bold text-xs text-gray-900">
-                  Light
-                </span>
-
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-pink-100 text-pink-600">
+                <Sun className="h-4 w-4" />
               </div>
 
-              {currentTheme === 'light' && (
-                <div className="w-5 h-5 rounded-full bg-pink-500 text-white flex items-center justify-center">
-                  <Check className="w-3 h-3 stroke-[3]" />
-                </div>
-              )}
-
+              <span className="text-xs font-bold text-gray-900">
+                Light
+              </span>
             </div>
 
-            <p className="text-[10px] text-gray-600 mt-3">
-              Pink & white vanity
-            </p>
-
+            {currentTheme === 'light' && (
+              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-pink-500 text-white">
+                <Check className="h-3 w-3" />
+              </div>
+            )}
           </div>
 
+          <div className="h-10 rounded-xl bg-[#FFFBF5]">
+            <div className="h-full rounded-xl bg-pink-100/40" />
+          </div>
+
+          <p className="mt-2 text-[10px] text-gray-500">
+            Pinky white beauty desk
+          </p>
         </button>
-
-
-        {/* DARK */}
 
         <button
+          type="button"
           onClick={() => handleSelectTheme('dark')}
-          className={`p-3 rounded-2xl border text-left transition-all relative overflow-hidden cursor-pointer min-h-[105px] ${
+          className={`relative overflow-hidden rounded-2xl border p-4 text-left transition-all ${
             currentTheme === 'dark'
-              ? 'border-pink-400 ring-2 ring-pink-400/30'
-              : 'border-[#5b3840] hover:border-pink-400'
+              ? 'border-pink-500 bg-[#3A2025] ring-2 ring-pink-400/40'
+              : 'border-gray-300 bg-[#2A181C] hover:border-pink-400'
           }`}
         >
-
-          <div className="absolute inset-0 bg-gradient-to-br from-[#24171a] via-[#342124] to-[#5b3840]" />
-
-          <div className="relative z-10">
-
-            <div className="flex items-center justify-between">
-
-              <div className="flex items-center gap-1.5">
-
-                <Moon className="w-4 h-4 text-pink-300" />
-
-                <span className="font-bold text-xs text-pink-50">
-                  Dark
-                </span>
-
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#5A3038] text-pink-200">
+                <Moon className="h-4 w-4" />
               </div>
 
-              {currentTheme === 'dark' && (
-                <div className="w-5 h-5 rounded-full bg-pink-500 text-white flex items-center justify-center">
-                  <Check className="w-3 h-3 stroke-[3]" />
-                </div>
-              )}
-
+              <span className="text-xs font-bold text-pink-50">
+                Dark
+              </span>
             </div>
 
-            <p className="text-[10px] text-pink-200 mt-3">
-              Chocolate & blush
-            </p>
-
+            {currentTheme === 'dark' && (
+              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-pink-500 text-white">
+                <Check className="h-3 w-3" />
+              </div>
+            )}
           </div>
 
-        </button>
+          <div className="h-10 rounded-xl bg-[#2A181C]">
+            <div className="h-full rounded-xl bg-[#5A3038]/70" />
+          </div>
 
+          <p className="mt-2 text-[10px] text-pink-100/70">
+            Chocolate pink beauty desk
+          </p>
+        </button>
       </div>
     </div>
   );
