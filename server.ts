@@ -11,7 +11,20 @@ const PORT = 3000;
 
 app.use(express.json({ limit: "25mb" }));
 
-const apiKey = process.env.GEMINI_API_KEY;
+/*
+|--------------------------------------------------------------------------
+| GEMINI
+|--------------------------------------------------------------------------
+*/
+
+const rawApiKey = process.env.GEMINI_API_KEY;
+
+const apiKey =
+  rawApiKey &&
+  rawApiKey.trim() &&
+  rawApiKey !== "MY_GEMINI_API_KEY"
+    ? rawApiKey.trim()
+    : null;
 
 let ai: GoogleGenAI | null = null;
 
@@ -20,7 +33,7 @@ if (apiKey) {
     apiKey,
     httpOptions: {
       headers: {
-        "User-Agent": "aistudio-build",
+        "User-Agent": "juliets-makeup-galore",
       },
     },
   });
@@ -28,312 +41,1491 @@ if (apiKey) {
 
 /*
 |--------------------------------------------------------------------------
-| JULIET'S STORE CATALOG
-|--------------------------------------------------------------------------
-| IMPORTANT:
-| These IDs MUST match src/data/mockData.ts
-|
-| Gemini is ONLY allowed to recommend products listed here.
+| HELPERS
 |--------------------------------------------------------------------------
 */
 
-const STORE_PRODUCTS = [
-  {
-    id: "prod_001",
-    name: "Hydrating Primer Serum",
-    priceKSh: 1200,
-    category: "Skincare",
-    description:
-      "A lightweight hydrating primer serum that helps prepare the skin for smooth makeup application.",
-  },
-  {
-    id: "prod_002",
-    name: "Nairobi Glow Liquid Highlighter",
-    priceKSh: 1500,
-    category: "Glow",
-    description:
-      "A radiant liquid highlighter designed to give the cheekbones a beautiful golden glow.",
-  },
-  {
-    id: "prod_003",
-    name: "Matte Finish Setting Powder",
-    priceKSh: 1000,
-    category: "Face",
-    description:
-      "A lightweight setting powder designed to reduce excess shine while keeping makeup looking fresh.",
-  },
-];
+function clamp(
+  value: unknown,
+  min = 0,
+  max = 100
+): number {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return min;
+  }
+
+  return Math.max(
+    min,
+    Math.min(max, Math.round(number))
+  );
+}
+
+function normalize(value: unknown): string {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function tokenize(value: unknown): string[] {
+  return normalize(value)
+    .split(" ")
+    .filter(
+      (word) => word.length >= 3
+    );
+}
 
 /*
 |--------------------------------------------------------------------------
-| SKIN SCAN
+| PRODUCT CATEGORY NORMALIZATION
+|--------------------------------------------------------------------------
+|
+| The server uses these categories to understand legitimate equivalents.
 |--------------------------------------------------------------------------
 */
 
-app.post("/api/gemini/skin-scan", async (req, res) => {
-  try {
-    if (!ai) {
-      return res.status(500).json({
-        error:
-          "GEMINI_API_KEY environment variable is not configured.",
-      });
+const synonymGroups: Record<string, string[]> = {
+  moisturizer: [
+    "moisturizer",
+    "moisturiser",
+    "hydrator",
+    "hydrating cream",
+    "face cream",
+    "facial cream",
+    "moisturizing cream",
+    "moisturising cream",
+  ],
+
+  serum: [
+    "serum",
+    "face serum",
+    "skin serum",
+    "facial serum",
+    "hydrating serum",
+  ],
+
+  cleanser: [
+    "cleanser",
+    "face cleanser",
+    "facial cleanser",
+    "face wash",
+    "facial wash",
+    "cleansing gel",
+    "cleansing foam",
+  ],
+
+  sunscreen: [
+    "sunscreen",
+    "sun screen",
+    "spf",
+    "sun protection",
+    "sunblock",
+  ],
+
+  primer: [
+    "primer",
+    "face primer",
+    "makeup primer",
+    "hydrating primer",
+    "mattifying primer",
+  ],
+
+  powder: [
+    "powder",
+    "setting powder",
+    "face powder",
+    "loose powder",
+    "pressed powder",
+    "finishing powder",
+  ],
+
+  highlighter: [
+    "highlighter",
+    "liquid highlighter",
+    "face highlighter",
+    "illuminator",
+    "illuminating powder",
+  ],
+
+  blush: [
+    "blush",
+    "cream blush",
+    "liquid blush",
+    "face blush",
+  ],
+
+  foundation: [
+    "foundation",
+    "face foundation",
+    "liquid foundation",
+    "cream foundation",
+    "skin foundation",
+  ],
+
+  concealer: [
+    "concealer",
+    "face concealer",
+    "under eye concealer",
+    "under-eye concealer",
+  ],
+
+  toner: [
+    "toner",
+    "face toner",
+    "facial toner",
+  ],
+
+  mask: [
+    "mask",
+    "face mask",
+    "facial mask",
+    "clay mask",
+    "sheet mask",
+  ],
+
+  lip_product: [
+    "lipstick",
+    "lip gloss",
+    "lipgloss",
+    "lip balm",
+    "lip oil",
+    "lip liner",
+    "lip product",
+  ],
+};
+
+function findCanonicalCategory(
+  value: unknown
+): string | null {
+  const normalized = normalize(value);
+
+  if (!normalized) {
+    return null;
+  }
+
+  for (const [
+    canonical,
+    terms,
+  ] of Object.entries(
+    synonymGroups
+  )) {
+    for (const term of terms) {
+      const normalizedTerm =
+        normalize(term);
+
+      if (
+        normalized === normalizedTerm ||
+        normalized.includes(normalizedTerm) ||
+        normalizedTerm.includes(normalized)
+      ) {
+        return canonical;
+      }
     }
+  }
 
-    const {
-      imageBase64,
-      mimeType = "image/jpeg",
-      notes,
-    } = req.body;
+  return null;
+}
 
-    if (!imageBase64) {
-      return res.status(400).json({
-        error: "Image data is required for skin scan.",
-      });
-    }
+/*
+|--------------------------------------------------------------------------
+| BUILD SAFE SHOP CATALOG
+|--------------------------------------------------------------------------
+*/
 
-    const cleanBase64 = imageBase64.replace(
-      /^data:image\/\w+;base64,/,
-      ""
+function buildSafeShopProducts(
+  shopProducts: unknown
+) {
+  if (!Array.isArray(shopProducts)) {
+    return [];
+  }
+
+  return shopProducts
+    .filter(
+      (product: any) =>
+        product &&
+        product.id &&
+        product.name
+    )
+    .map((product: any) => ({
+      id: String(product.id),
+      name: String(product.name),
+      category: String(
+        product.category || ""
+      ),
+      description: String(
+        product.description || ""
+      ),
+      priceKSh:
+        typeof product.priceKSh === "number"
+          ? product.priceKSh
+          : undefined,
+    }));
+}
+
+/*
+|--------------------------------------------------------------------------
+| PRODUCT MATCH SCORING
+|--------------------------------------------------------------------------
+|
+| This is deliberately conservative.
+|
+| 100 = very strong match
+| 80  = strong match
+| 60  = possible match
+| below 60 = do not recommend
+|--------------------------------------------------------------------------
+*/
+
+function scoreProductMatch(
+  recommendation: any,
+  product: any
+): number {
+  const recommendationType =
+    String(
+      recommendation.productType || ""
     );
 
-    /*
-    |--------------------------------------------------------------------------
-    | BUILD STORE CATALOG FOR JULIET
-    |--------------------------------------------------------------------------
-    */
+  const recommendationCategory =
+    String(
+      recommendation.category || ""
+    );
 
-    const catalogText = STORE_PRODUCTS.map(
-      (product) =>
-        `ID: ${product.id}
-Name: ${product.name}
-Price: KSh ${product.priceKSh}
-Category: ${product.category}
-Description: ${product.description}`
-    ).join("\n\n");
+  const productName =
+    String(product.name || "");
 
-    const prompt = `
-You are Juliet, the expert beauty assistant and founder of Juliet's Makeup Galore in Nairobi, Kenya.
+  const productCategory =
+    String(product.category || "");
 
-Analyze the user's facial image carefully.
+  const productDescription =
+    String(product.description || "");
 
-Look at visible characteristics such as:
+  const recommendedCanonical =
+    findCanonicalCategory(
+      recommendationType
+    ) ||
+    findCanonicalCategory(
+      recommendationCategory
+    );
+
+  const productCanonical =
+    findCanonicalCategory(
+      productCategory
+    ) ||
+    findCanonicalCategory(
+      productName
+    );
+
+  let score = 0;
+
+  /*
+  |--------------------------------------------------------------------------
+  | CATEGORY MATCH
+  |--------------------------------------------------------------------------
+  */
+
+  if (
+    recommendedCanonical &&
+    productCanonical
+  ) {
+    if (
+      recommendedCanonical ===
+      productCanonical
+    ) {
+      score += 65;
+    } else {
+      /*
+      Different product category.
+      Do not allow description keywords
+      to rescue an obviously wrong category.
+      */
+      return 0;
+    }
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | EXACT PRODUCT TYPE
+  |--------------------------------------------------------------------------
+  */
+
+  const normalizedRecommendation =
+    normalize(recommendationType);
+
+  const normalizedName =
+    normalize(productName);
+
+  const normalizedCategory =
+    normalize(productCategory);
+
+  if (
+    normalizedRecommendation &&
+    normalizedName.includes(
+      normalizedRecommendation
+    )
+  ) {
+    score += 30;
+  }
+
+  if (
+    normalizedRecommendation &&
+    normalizedCategory.includes(
+      normalizedRecommendation
+    )
+  ) {
+    score += 25;
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | CATEGORY WORD OVERLAP
+  |--------------------------------------------------------------------------
+  */
+
+  const recommendationWords = new Set(
+    tokenize(
+      `${recommendationType} ${recommendationCategory}`
+    )
+  );
+
+  const productWords = new Set(
+    tokenize(
+      `${productName} ${productCategory}`
+    )
+  );
+
+  let wordMatches = 0;
+
+  for (const word of recommendationWords) {
+    if (productWords.has(word)) {
+      wordMatches++;
+    }
+  }
+
+  score += Math.min(
+    wordMatches * 10,
+    25
+  );
+
+  /*
+  |--------------------------------------------------------------------------
+  | DESCRIPTION
+  |--------------------------------------------------------------------------
+  |
+  | Description can support a match but can NEVER create
+  | a category match on its own.
+  |--------------------------------------------------------------------------
+  */
+
+  const descriptionText =
+    normalize(productDescription);
+
+  let descriptionMatches = 0;
+
+  for (const word of recommendationWords) {
+    if (
+      descriptionText.includes(word)
+    ) {
+      descriptionMatches++;
+    }
+  }
+
+  score += Math.min(
+    descriptionMatches * 3,
+    10
+  );
+
+  return Math.min(score, 100);
+}
+
+/*
+|--------------------------------------------------------------------------
+| FIND BEST SHOP PRODUCT
+|--------------------------------------------------------------------------
+*/
+
+function findBestProductMatch(
+  recommendation: any,
+  shopProducts: any[]
+) {
+  let bestProduct: any = null;
+  let bestScore = 0;
+
+  for (const product of shopProducts) {
+    const score =
+      scoreProductMatch(
+        recommendation,
+        product
+      );
+
+    if (
+      score > bestScore
+    ) {
+      bestScore = score;
+      bestProduct = product;
+    }
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | IMPORTANT:
+  |
+  | We require a genuinely strong match.
+  |--------------------------------------------------------------------------
+  */
+
+  if (
+    bestProduct &&
+    bestScore >= 70
+  ) {
+    return {
+      product: bestProduct,
+      score: bestScore,
+    };
+  }
+
+  return {
+    product: null,
+    score: bestScore,
+  };
+}
+
+/*
+|--------------------------------------------------------------------------
+| JULIET AI SKIN SCAN
+|--------------------------------------------------------------------------
+*/
+
+app.post(
+  "/api/gemini/skin-scan",
+  async (req, res) => {
+    try {
+      /*
+      |--------------------------------------------------------------------------
+      | API KEY
+      |--------------------------------------------------------------------------
+      */
+
+      if (!ai) {
+        return res.status(500).json({
+          error:
+            "GEMINI_API_KEY environment variable is not configured or is invalid.",
+        });
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | REQUEST
+      |--------------------------------------------------------------------------
+      */
+
+      const {
+        imageBase64,
+        mimeType = "image/jpeg",
+        notes,
+        shopProducts = [],
+      } = req.body;
+
+      if (!imageBase64) {
+        return res.status(400).json({
+          error:
+            "Image data is required for skin scan.",
+        });
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | IMAGE
+      |--------------------------------------------------------------------------
+      */
+
+      const cleanBase64 =
+        imageBase64.replace(
+          /^data:image\/[^;]+;base64,/,
+          ""
+        );
+
+      /*
+      |--------------------------------------------------------------------------
+      | REAL SHOP INVENTORY
+      |--------------------------------------------------------------------------
+      */
+
+      const safeShopProducts =
+        buildSafeShopProducts(
+          shopProducts
+        );
+
+      const hasShopProducts =
+        safeShopProducts.length > 0;
+
+      /*
+      |--------------------------------------------------------------------------
+      | CATALOG FOR GEMINI
+      |--------------------------------------------------------------------------
+      |
+      | Gemini receives actual product IDs.
+      |
+      | It may recommend one of these IDs,
+      | but the server will ALWAYS validate the ID.
+      |--------------------------------------------------------------------------
+      */
+
+      const catalogText =
+        hasShopProducts
+          ? safeShopProducts
+              .map(
+                (product) =>
+                  `PRODUCT ID: ${product.id}
+PRODUCT NAME: ${product.name}
+CATEGORY: ${product.category}
+DESCRIPTION: ${product.description}`
+              )
+              .join("\n\n")
+          : "THE SHOP CURRENTLY HAS NO POSTED PRODUCTS.";
+
+      /*
+      |--------------------------------------------------------------------------
+      | AI PROMPT
+      |--------------------------------------------------------------------------
+      */
+
+      const prompt = `
+You are Juliet, a careful and friendly beauty-analysis assistant
+for Juliet's Makeup Galore in Nairobi, Kenya.
+
+You are analyzing a normal smartphone photograph.
+
+This is a cosmetic beauty-analysis experience.
+It is NOT a medical diagnostic system.
+
+Do not diagnose medical conditions.
+
+Do not claim certainty when the photograph does not support certainty.
+
+============================================================
+PHOTO QUALITY
+============================================================
+
+Accept ordinary smartphone photographs.
+
+Do NOT reject a photograph simply because:
+
+- lighting is imperfect
+- the image is slightly grainy
+- the face is slightly angled
+- the face is not perfectly centered
+- some background is visible
+- the camera is average
+- the skin is dark
+- the photograph is not studio quality
+
+Only reject photographs when analysis would genuinely be unreliable.
+
+Examples:
+
+- face mostly outside frame
+- no recognizable face
+- extreme blur
+- skin mostly covered
+- extreme filter
+- extreme colored lighting
+
+============================================================
+SKIN ANALYSIS
+============================================================
+
+If usable, assess only visible cosmetic characteristics:
+
 - apparent skin type
-- visible hydration
+- visible hydration appearance
 - visible dryness
 - visible shine
+- visible oiliness
 - visible texture
+- visible smoothness
+- visible complexion evenness
 - visible redness
-- visible complexion tone
+- apparent complexion tone
 - apparent undertone
+- visible radiance
 
-IMPORTANT:
-This is a cosmetic guidance experience, not a medical diagnosis.
-Do not diagnose medical skin conditions.
+Do not diagnose:
 
-YOUR STORE CATALOG
-==================
+- acne
+- eczema
+- rosacea
+- infections
+- pigmentation disorders
+- medical conditions
+
+============================================================
+SKIN TYPE
+============================================================
+
+Allowed:
+
+"Dry"
+"Oily"
+"Combination"
+"Normal"
+"Sensitive"
+"Unable to determine"
+
+Use cautious language.
+
+============================================================
+UNDERTONE
+============================================================
+
+Allowed:
+
+"Warm Golden"
+"Cool Rose"
+"Neutral Olive"
+"Rich Espresso"
+"Unable to determine"
+
+Do not force an undertone.
+
+============================================================
+COMPONENT SCORES
+============================================================
+
+Return five visual scores from 0 to 100:
+
+radianceScore
+hydrationAppearanceScore
+textureEvennessScore
+complexionEvennessScore
+oilBalanceScore
+
+Scores must reflect the actual photograph.
+
+Do not use flattering default scores.
+
+Do not make all scores similar.
+
+============================================================
+CURRENT SHOP INVENTORY
+============================================================
+
+THIS IS THE ONLY SOURCE OF TRUTH FOR SHOP PRODUCTS.
 
 ${catalogText}
 
-STRICT PRODUCT RULES
-====================
+============================================================
+CRITICAL PRODUCT RECOMMENDATION RULES
+============================================================
 
-You may ONLY recommend products from the store catalog above.
+You have TWO jobs:
 
-NEVER:
-- invent a product
-- invent a product ID
-- invent a price
-- recommend a product that is not in the catalog
-- create a product name that is not in the catalog
+1. Determine what PRODUCT TYPES would suit the visible characteristics.
+2. Where the actual shop catalogue contains a suitable product,
+   identify the EXACT PRODUCT ID from the catalogue.
 
-The "id" in recommendedProducts MUST EXACTLY match one of these IDs:
+NEVER invent:
 
-${STORE_PRODUCTS.map((p) => p.id).join(", ")}
+- product IDs
+- product names
+- prices
+- products
+- availability
 
-The "name" MUST EXACTLY match the corresponding store product name.
+If you recommend an actual shop product:
 
-The price should NEVER be included in your recommendation reason because the application gets the real price directly from the store catalog.
+shopProductId MUST be copied EXACTLY from the catalogue above.
 
-If none of the store products are suitable, return an empty recommendedProducts array.
+If there is no suitable shop product:
 
-Only recommend products that genuinely make sense for the user's visible characteristics.
+shopProductId MUST be null.
 
-You can recommend between 0 and 3 products.
+Do NOT select a product merely because its name contains words
+such as "glow", "beauty", "skin", "care", or "hydrating".
 
-${notes ? `USER NOTES:\n${notes}` : ""}
+The PRODUCT CATEGORY must make sense.
 
-RETURN THIS JSON:
+For example:
+
+A moisturizer recommendation should not be matched to a
+foundation simply because the foundation description contains
+the word "hydrating".
+
+A sunscreen recommendation should not be matched to a primer.
+
+A cleanser recommendation should not be matched to a serum.
+
+============================================================
+RECOMMENDATION QUALITY
+============================================================
+
+Recommendations should be based on the visible characteristics.
+
+Examples:
+
+Visible dryness/hydration concern:
+- moisturizer
+- hydrating serum
+- gentle cleanser
+
+Visible oiliness:
+- lightweight moisturizer
+- mattifying primer
+- setting powder
+
+Visible combination characteristics:
+- lightweight moisturizer
+- balancing serum
+- suitable primer
+
+Visible dull appearance:
+- hydrating serum
+- moisturizer
+- highlighter for makeup use
+
+Visible uneven texture:
+- gentle skincare preparation
+- suitable primer
+- lightweight complexion product
+
+Do not over-recommend.
+
+Return no more than 4 recommendations.
+
+Prioritize the most relevant recommendations first.
+
+============================================================
+USER NOTES
+============================================================
+
+${notes || "No additional user notes."}
+
+============================================================
+RETURN JSON
+============================================================
 
 {
-  "overallSkinType": "Dry" | "Oily" | "Combination" | "Normal" | "Sensitive",
-  "glowScore": integer between 1 and 100,
-  "hydrationLevel": "Optimal" | "Slightly Dehydrated" | "Dehydrated" | "Moisturized",
-  "undertone": "Warm Golden" | "Cool Rose" | "Neutral Olive" | "Rich Espresso",
+  "imageQuality": {
+    "usable": true,
+    "score": 80,
+    "issues": [],
+    "guidance": ""
+  },
+
+  "analysisConfidence": "High",
+
+  "overallSkinType": "Normal",
+
+  "radianceScore": 70,
+  "hydrationAppearanceScore": 70,
+  "textureEvennessScore": 75,
+  "complexionEvennessScore": 75,
+  "oilBalanceScore": 70,
+
+  "hydrationLevel": "Balanced",
+
+  "undertone": "Unable to determine",
+
   "keyObservations": [
-    "observation 1",
-    "observation 2",
-    "observation 3"
+    "Visible observation from the photograph"
   ],
+
   "concernsDetected": [
-    "concern 1",
-    "concern 2"
+    "Visible concern"
   ],
-  "skincareAdvice": "2-3 warm encouraging sentences from Juliet.",
+
+  "skincareAdvice": "Concise cosmetic advice.",
+
   "recommendedProducts": [
     {
-      "id": "EXACT STORE PRODUCT ID",
-      "name": "EXACT STORE PRODUCT NAME",
-      "reason": "Why this specific store product suits the visible characteristics."
+      "shopProductId": null,
+      "productType": "moisturizer",
+      "category": "Moisturizer",
+      "reason": "Reason based on visible characteristics."
     }
   ]
 }
+
+============================================================
+IF PHOTO IS UNUSABLE
+============================================================
+
+{
+  "imageQuality": {
+    "usable": false,
+    "score": 20,
+    "issues": [
+      "Face is too far from the camera"
+    ],
+    "guidance": "Move closer to the camera and make sure your face fills more of the frame."
+  },
+
+  "analysisConfidence": "Low",
+
+  "overallSkinType": "Unable to determine",
+
+  "radianceScore": 0,
+  "hydrationAppearanceScore": 0,
+  "textureEvennessScore": 0,
+  "complexionEvennessScore": 0,
+  "oilBalanceScore": 0,
+
+  "hydrationLevel": "Unable to determine",
+
+  "undertone": "Unable to determine",
+
+  "keyObservations": [],
+
+  "concernsDetected": [],
+
+  "skincareAdvice": "Please retake the photo using the guidance above.",
+
+  "recommendedProducts": []
+}
 `;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
+      /*
+      |--------------------------------------------------------------------------
+      | GEMINI REQUEST
+      |--------------------------------------------------------------------------
+      */
 
-      contents: {
-        parts: [
-          {
-            inlineData: {
-              data: cleanBase64,
-              mimeType,
-            },
-          },
-          {
-            text: prompt,
-          },
-        ],
-      },
+      const response =
+        await ai.models.generateContent({
+          model: "gemini-3.6-flash",
 
-      config: {
-        responseMimeType: "application/json",
-
-        responseSchema: {
-          type: Type.OBJECT,
-
-          properties: {
-            overallSkinType: {
-              type: Type.STRING,
-            },
-
-            glowScore: {
-              type: Type.INTEGER,
-            },
-
-            hydrationLevel: {
-              type: Type.STRING,
-            },
-
-            undertone: {
-              type: Type.STRING,
-            },
-
-            keyObservations: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.STRING,
+          contents: {
+            parts: [
+              {
+                inlineData: {
+                  data: cleanBase64,
+                  mimeType,
+                },
               },
-            },
-
-            concernsDetected: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.STRING,
+              {
+                text: prompt,
               },
-            },
+            ],
+          },
 
-            skincareAdvice: {
-              type: Type.STRING,
-            },
+          config: {
+            responseMimeType:
+              "application/json",
 
-            recommendedProducts: {
-              type: Type.ARRAY,
+            responseSchema: {
+              type: Type.OBJECT,
 
-              items: {
-                type: Type.OBJECT,
+              properties: {
+                imageQuality: {
+                  type: Type.OBJECT,
 
-                properties: {
-                  id: {
-                    type: Type.STRING,
+                  properties: {
+                    usable: {
+                      type: Type.BOOLEAN,
+                    },
+
+                    score: {
+                      type: Type.INTEGER,
+                    },
+
+                    issues: {
+                      type: Type.ARRAY,
+                      items: {
+                        type: Type.STRING,
+                      },
+                    },
+
+                    guidance: {
+                      type: Type.STRING,
+                    },
                   },
 
-                  name: {
-                    type: Type.STRING,
-                  },
+                  required: [
+                    "usable",
+                    "score",
+                    "issues",
+                    "guidance",
+                  ],
+                },
 
-                  reason: {
+                analysisConfidence: {
+                  type: Type.STRING,
+                },
+
+                overallSkinType: {
+                  type: Type.STRING,
+                },
+
+                radianceScore: {
+                  type: Type.INTEGER,
+                },
+
+                hydrationAppearanceScore: {
+                  type: Type.INTEGER,
+                },
+
+                textureEvennessScore: {
+                  type: Type.INTEGER,
+                },
+
+                complexionEvennessScore: {
+                  type: Type.INTEGER,
+                },
+
+                oilBalanceScore: {
+                  type: Type.INTEGER,
+                },
+
+                hydrationLevel: {
+                  type: Type.STRING,
+                },
+
+                undertone: {
+                  type: Type.STRING,
+                },
+
+                keyObservations: {
+                  type: Type.ARRAY,
+                  items: {
                     type: Type.STRING,
                   },
                 },
 
-                required: [
-                  "id",
-                  "name",
-                  "reason",
-                ],
+                concernsDetected: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.STRING,
+                  },
+                },
+
+                skincareAdvice: {
+                  type: Type.STRING,
+                },
+
+                recommendedProducts: {
+                  type: Type.ARRAY,
+
+                  items: {
+                    type: Type.OBJECT,
+
+                    properties: {
+                      shopProductId: {
+                        type: Type.STRING,
+                        nullable: true,
+                      },
+
+                      productType: {
+                        type: Type.STRING,
+                      },
+
+                      category: {
+                        type: Type.STRING,
+                      },
+
+                      reason: {
+                        type: Type.STRING,
+                      },
+                    },
+
+                    required: [
+                      "shopProductId",
+                      "productType",
+                      "category",
+                      "reason",
+                    ],
+                  },
+                },
               },
+
+              required: [
+                "imageQuality",
+                "analysisConfidence",
+                "overallSkinType",
+                "radianceScore",
+                "hydrationAppearanceScore",
+                "textureEvennessScore",
+                "complexionEvennessScore",
+                "oilBalanceScore",
+                "hydrationLevel",
+                "undertone",
+                "keyObservations",
+                "concernsDetected",
+                "skincareAdvice",
+                "recommendedProducts",
+              ],
             },
           },
+        });
 
-          required: [
-            "overallSkinType",
-            "glowScore",
-            "hydrationLevel",
-            "undertone",
-            "keyObservations",
-            "concernsDetected",
-            "skincareAdvice",
-            "recommendedProducts",
-          ],
-        },
-      },
-    });
+      /*
+      |--------------------------------------------------------------------------
+      | PARSE RESPONSE
+      |--------------------------------------------------------------------------
+      */
 
-    const jsonText = response.text || "{}";
+      const jsonText =
+        response.text || "{}";
 
-    const data = JSON.parse(jsonText);
+      let data: any;
 
-    /*
-    |--------------------------------------------------------------------------
-    | FINAL SECURITY CHECK
-    |--------------------------------------------------------------------------
-    | Even if Gemini somehow returns an invalid product,
-    | we remove it before sending the result to the app.
-    |--------------------------------------------------------------------------
-    */
+      try {
+        data = JSON.parse(jsonText);
+      } catch {
+        console.error(
+          "Gemini returned invalid JSON:",
+          jsonText
+        );
 
-    const validProductIds = new Set(
-      STORE_PRODUCTS.map((product) => product.id)
-    );
+        return res.status(500).json({
+          error:
+            "The AI returned an invalid scan result. Please try the photo again.",
+        });
+      }
 
-    const safeRecommendations = Array.isArray(
-      data.recommendedProducts
-    )
-      ? data.recommendedProducts.filter(
-          (product: any) =>
-            product &&
-            validProductIds.has(product.id)
+      /*
+      |--------------------------------------------------------------------------
+      | PHOTO QUALITY
+      |--------------------------------------------------------------------------
+      */
+
+      const qualityScore = clamp(
+        data.imageQuality?.score
+      );
+
+      const usableImage =
+        data.imageQuality?.usable === true;
+
+      /*
+      |--------------------------------------------------------------------------
+      | COMPONENT SCORES
+      |--------------------------------------------------------------------------
+      */
+
+      const radianceScore = clamp(
+        data.radianceScore
+      );
+
+      const hydrationAppearanceScore =
+        clamp(
+          data.hydrationAppearanceScore
+        );
+
+      const textureEvennessScore =
+        clamp(
+          data.textureEvennessScore
+        );
+
+      const complexionEvennessScore =
+        clamp(
+          data.complexionEvennessScore
+        );
+
+      const oilBalanceScore = clamp(
+        data.oilBalanceScore
+      );
+
+      /*
+      |--------------------------------------------------------------------------
+      | SERVER GLOW SCORE
+      |--------------------------------------------------------------------------
+      */
+
+      const calculatedGlowScore =
+        Math.round(
+          radianceScore * 0.25 +
+            hydrationAppearanceScore *
+              0.20 +
+            textureEvennessScore *
+              0.20 +
+            complexionEvennessScore *
+              0.20 +
+            oilBalanceScore *
+              0.15
+        );
+
+      /*
+      |--------------------------------------------------------------------------
+      | RECOMMENDATIONS
+      |--------------------------------------------------------------------------
+      */
+
+      const recommendations =
+        Array.isArray(
+          data.recommendedProducts
         )
-      : [];
+          ? data.recommendedProducts.slice(
+              0,
+              4
+            )
+          : [];
 
-    const finalResult = {
-      ...data,
-      recommendedProducts: safeRecommendations,
-    };
+      /*
+      |--------------------------------------------------------------------------
+      | VALIDATE GEMINI'S PRODUCT IDs
+      |--------------------------------------------------------------------------
+      |
+      | This is the most important accuracy improvement.
+      |
+      | Gemini may suggest an ID.
+      |
+      | We NEVER trust it blindly.
+      |
+      | We check that the ID actually exists in the
+      | current shop inventory.
+      |--------------------------------------------------------------------------
+      */
 
-    res.json(finalResult);
-  } catch (err: any) {
-    console.error("Juliet Skin Scan API Error:", err);
+      const safeRecommendations =
+        recommendations.map(
+          (recommendation: any) => {
+            const requestedId =
+              recommendation.shopProductId
+                ? String(
+                    recommendation.shopProductId
+                  )
+                : null;
 
-    res.status(500).json({
-      error:
-        err.message ||
-        "Skin scan analysis failed.",
-    });
+            let matchedProduct: any =
+              null;
+
+            let matchMethod =
+              "none";
+
+            let matchScore = 0;
+
+            /*
+            |--------------------------------------------------------------------------
+            | STEP 1 — EXACT ID VALIDATION
+            |--------------------------------------------------------------------------
+            */
+
+            if (requestedId) {
+              matchedProduct =
+                safeShopProducts.find(
+                  (product) =>
+                    product.id ===
+                    requestedId
+                );
+
+              if (matchedProduct) {
+                /*
+                |------------------------------------------------------------------
+                | Even when Gemini provides an existing ID,
+                | make sure the product category makes sense.
+                |------------------------------------------------------------------
+                */
+
+                const recommendedCanonical =
+                  findCanonicalCategory(
+                    recommendation.productType
+                  ) ||
+                  findCanonicalCategory(
+                    recommendation.category
+                  );
+
+                const productCanonical =
+                  findCanonicalCategory(
+                    matchedProduct.category
+                  ) ||
+                  findCanonicalCategory(
+                    matchedProduct.name
+                  );
+
+                if (
+                  recommendedCanonical &&
+                  productCanonical &&
+                  recommendedCanonical !==
+                    productCanonical
+                ) {
+                  /*
+                  |--------------------------------------------------------------
+                  | Gemini chose a real product but it is the wrong category.
+                  | Reject it.
+                  |--------------------------------------------------------------
+                  */
+
+                  matchedProduct =
+                    null;
+                } else {
+                  matchMethod =
+                    "verified-id";
+
+                  matchScore = 100;
+                }
+              }
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | STEP 2 — SAFE FALLBACK MATCH
+            |--------------------------------------------------------------------------
+            |
+            | Only used when Gemini did not provide a valid product ID.
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+              !matchedProduct &&
+              safeShopProducts.length > 0
+            ) {
+              const fallback =
+                findBestProductMatch(
+                  recommendation,
+                  safeShopProducts
+                );
+
+              if (fallback.product) {
+                matchedProduct =
+                  fallback.product;
+
+                matchScore =
+                  fallback.score;
+
+                matchMethod =
+                  "verified-category-match";
+              }
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | AVAILABLE
+            |--------------------------------------------------------------------------
+            */
+
+            const available =
+              matchedProduct !== null;
+
+            /*
+            |--------------------------------------------------------------------------
+            | FINAL SAFE PRODUCT
+            |--------------------------------------------------------------------------
+            */
+
+            return {
+              id: available
+                ? matchedProduct.id
+                : "",
+
+              name: available
+                ? matchedProduct.name
+                : recommendation.productType ||
+                  recommendation.category ||
+                  "Recommended beauty product",
+
+              reason:
+                recommendation.reason ||
+                "This product may suit the visible characteristics.",
+
+              productType:
+                recommendation.productType ||
+                "",
+
+              category:
+                recommendation.category ||
+                "",
+
+              availableInShop:
+                available,
+
+              availabilityLabel:
+                available
+                  ? "Available in shop"
+                  : "Not available in shop",
+
+              shopProductId:
+                available
+                  ? matchedProduct.id
+                  : null,
+
+              shopProductName:
+                available
+                  ? matchedProduct.name
+                  : null,
+
+              /*
+              |----------------------------------------------------------------
+              | DEBUG/TRANSPARENCY INFORMATION
+              |----------------------------------------------------------------
+              |
+              | This is useful while we are testing the app.
+              |----------------------------------------------------------------
+              */
+
+              matchMethod,
+
+              matchScore,
+            };
+          }
+        );
+
+      /*
+      |--------------------------------------------------------------------------
+      | REMOVE DUPLICATE SHOP PRODUCTS
+      |--------------------------------------------------------------------------
+      |
+      | Prevent the AI from recommending the same product twice.
+      |--------------------------------------------------------------------------
+      */
+
+      const seenProductIds =
+        new Set<string>();
+
+      const uniqueRecommendations =
+        safeRecommendations.filter(
+          (recommendation: any) => {
+            if (
+              !recommendation.shopProductId
+            ) {
+              return true;
+            }
+
+            if (
+              seenProductIds.has(
+                recommendation.shopProductId
+              )
+            ) {
+              return false;
+            }
+
+            seenProductIds.add(
+              recommendation.shopProductId
+            );
+
+            return true;
+          }
+        );
+
+      /*
+      |--------------------------------------------------------------------------
+      | FINAL RESULT
+      |--------------------------------------------------------------------------
+      */
+
+      const finalResult = {
+        imageQuality: {
+          usable: usableImage,
+
+          score: qualityScore,
+
+          issues:
+            Array.isArray(
+              data.imageQuality?.issues
+            )
+              ? data.imageQuality.issues
+              : [],
+
+          guidance:
+            data.imageQuality?.guidance ||
+            "Use bright, even light, face the camera and move slightly closer.",
+        },
+
+        analysisConfidence:
+          usableImage
+            ? data.analysisConfidence ||
+              "Moderate"
+            : "Low",
+
+        overallSkinType:
+          usableImage
+            ? data.overallSkinType ||
+              "Unable to determine"
+            : "Unable to determine",
+
+        hydrationLevel:
+          usableImage
+            ? data.hydrationLevel ||
+              "Unable to determine"
+            : "Unable to determine",
+
+        undertone:
+          usableImage
+            ? data.undertone ||
+              "Unable to determine"
+            : "Unable to determine",
+
+        radianceScore:
+          usableImage
+            ? radianceScore
+            : 0,
+
+        hydrationAppearanceScore:
+          usableImage
+            ? hydrationAppearanceScore
+            : 0,
+
+        textureEvennessScore:
+          usableImage
+            ? textureEvennessScore
+            : 0,
+
+        complexionEvennessScore:
+          usableImage
+            ? complexionEvennessScore
+            : 0,
+
+        oilBalanceScore:
+          usableImage
+            ? oilBalanceScore
+            : 0,
+
+        glowScore:
+          usableImage
+            ? calculatedGlowScore
+            : 0,
+
+        keyObservations:
+          usableImage &&
+          Array.isArray(
+            data.keyObservations
+          )
+            ? data.keyObservations
+            : [],
+
+        concernsDetected:
+          usableImage &&
+          Array.isArray(
+            data.concernsDetected
+          )
+            ? data.concernsDetected
+            : [],
+
+        skincareAdvice:
+          usableImage
+            ? data.skincareAdvice ||
+              "Try a simple skincare routine suited to your visible skin characteristics."
+            : "Please retake the photo using the guidance above.",
+
+        recommendedProducts:
+          usableImage
+            ? uniqueRecommendations
+            : [],
+      };
+
+      /*
+      |--------------------------------------------------------------------------
+      | RESPONSE
+      |--------------------------------------------------------------------------
+      */
+
+      return res.json(
+        finalResult
+      );
+    } catch (err: any) {
+      console.error(
+        "Juliet AI Skin Scan Error:",
+        err
+      );
+
+      return res.status(500).json({
+        error:
+          err?.message ||
+          "Skin scan analysis failed. Please try again.",
+      });
+    }
   }
-});
+);
 
 /*
 |--------------------------------------------------------------------------
@@ -341,35 +1533,35 @@ RETURN THIS JSON:
 |--------------------------------------------------------------------------
 */
 
-app.post("/api/gemini/chat", async (req, res) => {
-  try {
-    if (!ai) {
-      return res.status(500).json({
-        error:
-          "GEMINI_API_KEY environment variable is not configured.",
-      });
-    }
+app.post(
+  "/api/gemini/chat",
+  async (req, res) => {
+    try {
+      if (!ai) {
+        return res.status(500).json({
+          error:
+            "GEMINI_API_KEY environment variable is not configured or is invalid.",
+        });
+      }
 
-    const {
-      history = [],
-      message,
-    } = req.body;
+      const {
+        history = [],
+        message,
+      } = req.body;
 
-    if (!message) {
-      return res.status(400).json({
-        error: "Message is required.",
-      });
-    }
+      if (!message) {
+        return res.status(400).json({
+          error:
+            "Message is required.",
+        });
+      }
 
-    const catalogText = STORE_PRODUCTS.map(
-      (product) =>
-        `- ${product.name} — KSh ${product.priceKSh} — ${product.category}`
-    ).join("\n");
-
-    const systemInstruction = `
-You are Juliet, the warm, stylish and knowledgeable beauty assistant and founder of Juliet's Makeup Galore in Nairobi, Kenya.
+      const systemInstruction = `
+You are Juliet, the warm, stylish and knowledgeable beauty assistant
+and founder of Juliet's Makeup Galore in Nairobi, Kenya.
 
 Help customers with:
+
 - skincare preparation
 - makeup techniques
 - product selection
@@ -378,21 +1570,17 @@ Help customers with:
 - store products
 - artist services
 
-IMPORTANT STORE RULE:
+IMPORTANT:
 
-Only talk about products that exist in this store catalog.
+Do not invent products.
 
-CURRENT STORE CATALOG:
+Do not invent prices.
 
-${catalogText}
+If the customer asks about a shop product and you do not have
+reliable information that it is currently available, say that
+you cannot confirm its availability.
 
-Never invent products.
-
-Never invent prices.
-
-If a customer asks about a product that is not in the catalog, explain that it is not currently available and suggest one of the available products when appropriate.
-
-Keep your answers warm, conversational and concise.
+Keep answers warm, conversational and concise.
 
 Use clean line breaks and occasional beauty emojis.
 
@@ -404,53 +1592,69 @@ ARTIST SERVICES:
 - 1-on-1 Personal Beauty Masterclass — KSh 4,000
 `;
 
-    const contents = [
-      ...history.map((h: any) => ({
-        role: h.role,
-        parts: [
-          {
-            text: h.text || h.message || "",
+      const contents = [
+        ...history.map(
+          (h: any) => ({
+            role:
+              h.role === "assistant"
+                ? "model"
+                : "user",
+
+            parts: [
+              {
+                text:
+                  h.text ||
+                  h.message ||
+                  "",
+              },
+            ],
+          })
+        ),
+
+        {
+          role: "user",
+
+          parts: [
+            {
+              text: message,
+            },
+          ],
+        },
+      ];
+
+      const response =
+        await ai.models.generateContent({
+          model:
+            "gemini-3.6-flash",
+
+          contents,
+
+          config: {
+            systemInstruction,
           },
-        ],
-      })),
+        });
 
-      {
-        role: "user",
-        parts: [
-          {
-            text: message,
-          },
-        ],
-      },
-    ];
+      const reply =
+        response.text ||
+        "I'm so glad you asked! How else can I help you sparkle today? ♡";
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
+      return res.json({
+        reply,
+      });
+    } catch (err: any) {
+      console.error(
+        "Juliet Chat Error:",
+        err
+      );
 
-      contents,
-
-      config: {
-        systemInstruction,
-      },
-    });
-
-    const reply =
-      response.text ||
-      "I'm so glad you asked! How else can I help you sparkle today? ♡";
-
-    res.json({
-      reply,
-    });
-  } catch (err: any) {
-    console.error("Juliet Chat Error:", err);
-
-    res.status(500).json({
-      error:
-        err.message ||
-        "Failed to process chat with Juliet.",
-    });
+      return res.status(500).json({
+        error:
+          err?.message ||
+          "Failed to process chat.",
+      });
+    }
   }
-});
+);
 
 /*
 |--------------------------------------------------------------------------
@@ -459,29 +1663,46 @@ ARTIST SERVICES:
 */
 
 async function startServer() {
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: {
-        middlewareMode: true,
-      },
+  if (
+    process.env.NODE_ENV !==
+    "production"
+  ) {
+    const vite =
+      await createViteServer({
+        server: {
+          middlewareMode: true,
+        },
 
-      appType: "spa",
-    });
+        appType: "spa",
+      });
 
-    app.use(vite.middlewares);
+    app.use(
+      vite.middlewares
+    );
   } else {
-    const distPath = path.join(
-      process.cwd(),
-      "dist"
+    const distPath =
+      path.join(
+        process.cwd(),
+        "dist"
+      );
+
+    app.use(
+      express.static(
+        distPath
+      )
     );
 
-    app.use(express.static(distPath));
-
-    app.get("*", (req, res) => {
-      res.sendFile(
-        path.join(distPath, "index.html")
-      );
-    });
+    app.get(
+      "*",
+      (req, res) => {
+        res.sendFile(
+          path.join(
+            distPath,
+            "index.html"
+          )
+        );
+      }
+    );
   }
 
   app.listen(
